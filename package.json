@@ -15,7 +15,9 @@
   "license": "MIT",
   "devDependencies": {
     "@types/jest": "^23.1.1",
+    "@types/node": "^10.3.4",
     "jest": "^23.1.0",
+    "path": "^0.12.7",
     "ts-jest": "^22.4.6",
     "typescript": "^2.9.2"
   },
@@ -30,5 +32,9 @@
       "js",
       "json"
     ]
+  },
+  "dependencies": {
+    "@types/js-yaml": "^3.11.1",
+    "js-yaml": "^3.12.0"
   }
 }
