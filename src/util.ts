@@ -19,14 +19,16 @@ export const normalizePath = (path: string): string => {
 };
 
 // Write each response to JSON files.
-export const writeFiles = (data: { [file: string]: any }): void => {
+export const writeFiles = (
+  data: { [file: string]: any },
+  log: (message: any) => void
+): void => {
   Object.keys(data).forEach(key => {
     const val = data[key];
-    const path = join(__dirname, `${key}.json`);
+    const fileName = `${key}.json`
+    const path = join(__dirname, fileName);
+    log(fileName);
     const formatted = JSON.stringify(val, null, 2);
     fs.writeFileSync(path, formatted);
   });
 };
-
-
-

@@ -1,4 +1,5 @@
 import * as commander from "commander";
+import chalk from "chalk";
 import {
   OpenAPIObject,
   SchemaObject,
@@ -19,6 +20,7 @@ import { getSchemaName, normalizePath, writeFiles } from "./util";
 
 const APPLICATION_JSON = "application/json";
 const REF = "$ref";
+const log = console.log;
 
 type ResponsesType = {
   [path: string]: {
@@ -197,6 +199,7 @@ export const parseArray = (
   return [];
 };
 
+log(chalk.yellowBright("swagger-to-mock"));
 commander
   .arguments("<file>")
   .action(async file => {
@@ -205,9 +208,11 @@ commander
       const responses = extractResponses(content);
       const schemas = extractSchemas(content);
       const composed = composeMockData(responses, schemas);
-      writeFiles(composed);
+      writeFiles(composed, log);
+      log(chalk.yellowBright("Completed"));
     } catch (e) {
-      console.error(e);
+      log(chalk.redBright(e));
+      log(chalk.redBright("Failed"));
     }
   })
   .parse(process.argv);
