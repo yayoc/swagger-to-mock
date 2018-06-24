@@ -26,7 +26,7 @@ export const writeFiles = (
   Object.keys(data).forEach(key => {
     const val = data[key];
     const fileName = `${key}.json`
-    const path = join(__dirname, fileName);
+    const path = join(".", fileName);
     log(fileName);
     const formatted = JSON.stringify(val, null, 2);
     fs.writeFileSync(path, formatted);
