@@ -14,9 +14,10 @@ npm i swagger-to-mock
 swagger-to-mock <YOUR SWAGGER FILE OR URL>
 ```
 
-will generate `mock.json` includes every API responses.  
-And JSON data values should be example values on your swagger if you specified,  
-Otherwise values should be default values below.
+will generate JSON file per each API response.  
+JSON data values should be example values on your swagger if you specified examples.  
+Otherwise, `swagger-to-mock` follows [data type rules](https://github.com/yayoc/swagger-to-mock/#data-type-support) and generate arbitrary values.  
+If there is no rule like `format`, values should be below.
 
 ```yaml
 string: ""
@@ -27,7 +28,7 @@ array: []
 object: {}
 ```
 
-## Data Type Support
+## Data Type Support [In Progress]
 
 `swagger-to-mock` will follow rules based on [OpenAPI 3 specification](https://swagger.io/docs/specification/data-models/data-types/) for each data type, If the example value is not specified.
 
