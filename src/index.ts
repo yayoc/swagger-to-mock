@@ -50,7 +50,7 @@ type Schemas = {
 const extractSchemas = (obj: OpenAPI): Schemas => {
   const { schemas } = obj.components;
   return Object.keys(schemas).reduce((acc: any, name: string) => {
-    acc[name] = getMockData(schemas, name);
+    acc[name] = getSchemaData(schemas, name);
     return acc;
   }, {});
 };
@@ -120,7 +120,7 @@ export const getSchemaName = (ref: string): string | null => {
 };
 
 // Retrieve mock data of schema.
-const getMockData = (schemas: any, name: string): Object => {
+const getSchemaData = (schemas: any, name: string): Object => {
   const schema = schemas[name];
   if (isAllOf(schema)) {
     return mergeAllOf(schema["allOf"], schemas);
@@ -135,7 +135,7 @@ const getMockData = (schemas: any, name: string): Object => {
     return {};
   } else if (isRef(schema)) {
     const schemaName = getSchemaName(schema["$ref"]);
-    return schemaName ? getMockData(schemas, schemaName) : {};
+    return schemaName ? getSchemaData(schemas, schemaName) : {};
   }
   return schema;
 };
@@ -205,7 +205,7 @@ export const mergeAllOf = (properties: any[], schemas: any): any => {
     if (isRef(property)) {
       const schemaName = getSchemaName(property["$ref"]);
       if (schemaName) {
-        const schemaData = getMockData(schemas, schemaName);
+        const schemaData = getSchemaData(schemas, schemaName);
         ret = Object.assign({}, ret, schemaData);
       }
     } else if (DataType.isObject(property.type)) {
@@ -225,7 +225,7 @@ export const parseObject = (obj: ObjectType, schemas: Schemas): any => {
     if (isRef(property)) {
       const schemaName = getSchemaName(property["$ref"]);
       if (schemaName) {
-        const schema = getMockData(schemas, schemaName);
+        const schema = getSchemaData(schemas, schemaName);
         acc[key] = Object.assign({}, schema);
       }
     } else if (isAllOf(property)) {
@@ -250,7 +250,11 @@ type ArrayType = {
 export const parseArray = (arr: ArrayType, schemas: Schemas): any => {
   if (isRef(arr.items)) {
     const schemaName = getSchemaName(arr.items["$ref"]);
-    return schemaName ? schemas[schemaName] : [];
+    if (schemaName) {
+      const schema = getSchemaData(schemas, schemaName);
+      return [schema];
+    }
+    return [];
   } else {
     return [DataType.defaultValue(arr.items.type)];
   }
