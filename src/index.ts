@@ -8,7 +8,7 @@ import {
   ReferenceObject,
   PathItemObject
 } from "openapi3-ts";
-import { parse } from "./parse";
+import { parse } from "./fileParse";
 import {
   DataType,
   isObject,

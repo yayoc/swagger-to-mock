@@ -1,4 +1,4 @@
-import { parse } from "../src/parse";
+import { parse } from "../src/fileParse";
 import { join } from "path";
 
 describe("[parse]", () => {
