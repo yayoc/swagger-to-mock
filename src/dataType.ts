@@ -10,34 +10,13 @@ export enum DataType {
 }
 
 export namespace DataType {
-  export function isString(type: string): boolean {
-    return type === DataType.string;
-  }
-
-  export function isNumber(type: string): boolean {
-    return type === DataType.number;
-  }
-
-  export function isInteger(type: string): boolean {
-    return type === DataType.integer;
-  }
-
-  export function isBoolean(type: string): boolean {
-    return type === DataType.boolean;
-  }
-
-  export function isArray(type: string): boolean {
-    return type === DataType.array;
-  }
-
-  export function isObject(type: string): boolean {
-    return type === DataType.object;
-  }
-
-  export function defaultValue(type: string): any {
-    switch (type) {
+  export function defaultValue(schema: SchemaObject): any {
+    if (schema.example) {
+      return schema.example;
+    }
+    switch (schema.type) {
       case DataType.string:
-        return "";
+        return getStringDefaultValue(schema);
       case DataType.number:
       case DataType.integer:
         return 0;
@@ -47,7 +26,30 @@ export namespace DataType {
         return [];
       case DataType.object:
         return {};
+      default:
+        return {};
     }
+  }
+
+  export function getStringDefaultValue(schema: SchemaObject): string {
+    if (schema.format) {
+      switch (schema.format) {
+        case "date":
+          return "2017-07-21";
+        case "date-time":
+          return "2017-07-21T17:32:28Z";
+        case "password":
+          return "password";
+        case "byte":
+          return "U3dhZ2dlciByb2Nrcw==";
+        case "binary":
+          return "binary";
+        default:
+          return "";
+      }
+    }
+    // TODO: pattern support
+    return "";
   }
 }
 
@@ -60,7 +62,7 @@ export const isArray = (
 export const isObject = (
   schema: SchemaObject
 ): schema is SchemaObject & { type: "object" } => {
-  return schema.type === DataType.object;
+  return schema.type === DataType.object || schema.properties !== undefined;
 };
 
 export const isAllOf = (
@@ -69,15 +71,19 @@ export const isAllOf = (
   return schema.allOf !== undefined;
 };
 
-export const isOneOf = (schema: SchemaObject): boolean => {
-  return "oneOf" in schema;
+export const isOneOf = (
+  schema: SchemaObject
+): schema is SchemaObject & { oneOf: (SchemaObject | ReferenceObject)[] } => {
+  return schema.oneOf !== undefined;
 };
 
-export const isAnyOf = (schema: SchemaObject): boolean => {
-  return "anyOf" in schema;
+export const isAnyOf = (
+  schema: SchemaObject
+): schema is SchemaObject & { anyOf: (SchemaObject | ReferenceObject)[] } => {
+  return schema.anyOf !== undefined;
 };
 
-export const isRef = (
+export const isReferenceObject = (
   schema: SchemaObject | ReferenceObject
 ): schema is ReferenceObject => {
   return "$ref" in schema;

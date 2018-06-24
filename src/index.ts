@@ -13,7 +13,7 @@ import {
   isAllOf,
   isOneOf,
   isAnyOf,
-  isRef
+  isReferenceObject
 } from "./dataType";
 import { getSchemaName, normalizePath, writeFiles } from "./util";
 
@@ -60,20 +60,17 @@ const extractSchemas = (obj: OpenAPIObject): Schemas => {
 // Retrieve mock data of schema.
 const getSchemaData = (schemas: Schemas, name: string): Object => {
   const schema = schemas[name];
+  if (isReferenceObject(schema)) {
+    const schemaName = getSchemaName(schema[REF]);
+    return schemaName ? getSchemaData(schemas, schemaName) : {};
+  }
+
   if (isAllOf(schema)) {
     return mergeAllOf(schema["allOf"], schemas);
   } else if (isArray(schema)) {
     return parseArray(schema, schemas);
-  } else if ("properties" in schema) {
+  } else if (isObject(schema)) {
     return parseObject(schema, schemas);
-  } else if ("additionalProperties" in schema) {
-    if (schema.example) {
-      return schema.example;
-    }
-    return {};
-  } else if (isRef(schema)) {
-    const schemaName = getSchemaName(schema[REF]);
-    return schemaName ? getSchemaData(schemas, schemaName) : {};
   }
   return schema;
 };
@@ -102,9 +99,9 @@ const composeMockData = (
           ret[pathKey] = values;
         }
       } else {
-        if (DataType.isObject(schema.type)) {
+        if (isObject(schema)) {
           ret[pathKey] = parseObject(schema, schemas);
-        } else if (DataType.isArray(schema.type)) {
+        } else if (isArray(schema)) {
           ret[pathKey] = parseArray(schema, schemas);
         } else {
           ret[pathKey] = val.schema.properties;
@@ -120,14 +117,14 @@ export const mergeAllOf = (
   schemas: Schemas
 ): any => {
   let ret: any = {};
-  properties.forEach((property: any) => {
-    if (isRef(property)) {
+  properties.forEach(property => {
+    if (isReferenceObject(property)) {
       const schemaName = getSchemaName(property[REF]);
       if (schemaName) {
         const schemaData = getSchemaData(schemas, schemaName);
         ret = Object.assign({}, ret, schemaData);
       }
-    } else if (DataType.isObject(property.type)) {
+    } else {
       const parsed = parseObject(property, schemas);
       ret = Object.assign({}, ret, parsed);
     }
@@ -135,27 +132,49 @@ export const mergeAllOf = (
   return ret;
 };
 
+export const pickOneOf = (
+  properties: (SchemaObject | ReferenceObject)[],
+  schemas: Schemas
+): any => {
+  const property = properties[0];
+  if (isReferenceObject(property)) {
+    const schemaName = getSchemaName(property[REF]);
+    if (schemaName) {
+      const schemaData = getSchemaData(schemas, schemaName);
+      return Object.assign({}, schemaData);
+    }
+  }
+  const parsed = parseObject(property, schemas);
+  return Object.assign({}, parsed);
+};
+
 export const parseObject = (obj: SchemaObject, schemas: Schemas): any => {
+  if (obj.example) return obj.example;
   if (!obj.properties) {
     return {};
   }
   return Object.keys(obj.properties).reduce((acc: any, key: string) => {
     const property = obj.properties![key];
-    if (isRef(property)) {
+    if (isReferenceObject(property)) {
       const schemaName = getSchemaName(property[REF]);
       if (schemaName) {
         const schema = getSchemaData(schemas, schemaName);
         acc[key] = Object.assign({}, schema);
       }
-    } else if (isAllOf(property)) {
+      return acc;
+    }
+    if (isAllOf(property)) {
       acc[key] = mergeAllOf(property["allOf"], schemas);
-    } else if (isAnyOf(property) || isOneOf(property)) {
+    } else if (isOneOf(property)) {
+      acc[key] = pickOneOf(property.oneOf, schemas);
+    } else if (isAnyOf(property)) {
+      acc[key] = pickOneOf(property.anyOf, schemas);
     } else if (isObject(property)) {
       acc[key] = parseObject(property, schemas);
     } else if (isArray(property)) {
       acc[key] = parseArray(property, schemas);
     } else if (property.type) {
-      acc[key] = property.example || DataType.defaultValue(property.type);
+      acc[key] = DataType.defaultValue(property);
     }
     return acc;
   }, {});
@@ -165,7 +184,7 @@ export const parseArray = (
   arr: SchemaObject & { items: SchemaObject | ReferenceObject },
   schemas: Schemas
 ): Object[] => {
-  if (isRef(arr.items)) {
+  if (isReferenceObject(arr.items)) {
     const schemaName = getSchemaName(arr.items[REF]);
     if (schemaName) {
       const schema = getSchemaData(schemas, schemaName);
@@ -173,7 +192,7 @@ export const parseArray = (
     }
     return [];
   } else if (arr.items.type) {
-    return [DataType.defaultValue(arr.items.type)];
+    return [DataType.defaultValue(arr.items)];
   }
   return [];
 };
