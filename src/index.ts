@@ -1,4 +1,6 @@
 import * as commander from "commander";
+import * as fs from "fs";
+import { join } from "path";
 import { parse } from "./parse";
 
 type OpenAPI = {
@@ -47,11 +49,10 @@ type Schemas = {
 
 const extractSchemas = (obj: OpenAPI): Schemas => {
   const { schemas } = obj.components;
-  let ret: any = {};
-  Object.keys(schemas).forEach((name: string) => {
-    ret[name] = getMockData(schemas, name);
-  });
-  return ret;
+  return Object.keys(schemas).reduce((acc: any, name: string) => {
+    acc[name] = getMockData(schemas, name);
+    return acc;
+  }, {});
 };
 
 // Type Check
@@ -66,6 +67,30 @@ enum DataType {
 }
 
 namespace DataType {
+  export function isString(type: DataType): boolean {
+    return type === DataType.string;
+  }
+
+  export function isNumber(type: DataType): boolean {
+    return type === DataType.number;
+  }
+
+  export function isInteger(type: DataType): boolean {
+    return type === DataType.integer;
+  }
+
+  export function isBoolean(type: DataType): boolean {
+    return type === DataType.boolean;
+  }
+
+  export function isArray(type: DataType): boolean {
+    return type === DataType.array;
+  }
+
+  export function isObject(type: DataType): boolean {
+    return type === DataType.object;
+  }
+
   export function defaultValue(type: DataType): any {
     switch (type) {
       case DataType.string:
@@ -83,6 +108,7 @@ namespace DataType {
   }
 }
 
+// Extract schema name
 export const getSchemaName = (ref: string): string | null => {
   const re = /#\/components\/schemas\/(.*)/;
   const matches = ref.match(re);
@@ -96,53 +122,18 @@ export const getSchemaName = (ref: string): string | null => {
 // Retrieve mock data of schema.
 const getMockData = (schemas: any, name: string): Object => {
   const schema = schemas[name];
-  if ("allOf" in schema) {
-    let ret = {};
-    schema["allOf"].forEach((data: any) => {
-      if ("$ref" in data) {
-        const schemaName = getSchemaName(data["$ref"]);
-        if (schemaName) {
-          const schemaData = getMockData(schemas, schemaName);
-          ret = Object.assign({}, schemaData);
-        }
-      } else if (data.type === "object") {
-        const objectMockData: any = {};
-        if ("properties" in data) {
-          Object.keys(data.properties).forEach(property => {
-            const value = data.properties[property];
-            objectMockData[property] =
-              value.example || DataType.defaultValue(value.type);
-          });
-          ret = Object.assign({}, objectMockData);
-        }
-      }
-    });
-    return ret;
-  } else if (schema.type === "array") {
-    if ("$ref" in schema.items) {
-      const schemaName = getSchemaName(schema.items["$ref"]);
-      return schemaName ? [getMockData(schemas, schemaName)] : [];
-    } else {
-      return [DataType.defaultValue(schema.items.type)];
-    }
+  if (isAllOf(schema)) {
+    return mergeAllOf(schema["allOf"], schemas);
+  } else if (DataType.isArray(schema.type)) {
+    return parseArray(schema, schemas);
   } else if ("properties" in schema) {
-    let ret: any = {};
-    Object.keys(schema.properties).forEach((property: string) => {
-      const value = schema.properties[property];
-      if ("$ref" in value) {
-        const schemaName = getSchemaName(value["$ref"]);
-        ret[property] = schemaName ? getMockData(schemas, schemaName) : {};
-      } else {
-        ret[property] = value.example || DataType.defaultValue(value.type);
-      }
-    });
-    return ret;
+    return parseObject(schema, schemas);
   } else if ("additionalProperties" in schema) {
     if (schema.example) {
       return schema.example;
     }
     return {};
-  } else if ("$ref" in schema) {
+  } else if (isRef(schema)) {
     const schemaName = getSchemaName(schema["$ref"]);
     return schemaName ? getMockData(schemas, schemaName) : {};
   }
@@ -161,19 +152,25 @@ const composeMockData = (
   let ret: any = {};
   Object.keys(responses).forEach(path => {
     const res: any = responses[path];
+    const pathKey = normalizePath(path);
     if (res) {
       const val = res["application/json"];
-      if ("schema" in val) {
-        const ref = val.schema["$ref"];
-        if (ref) {
-          const schemaName = getSchemaName(ref);
-          if (schemaName) {
-            const values = schemas[schemaName];
-            ret[normalizePath(path)] = values;
-          }
+      const { schema } = val;
+      const ref = schema["$ref"];
+      if (ref) {
+        const schemaName = getSchemaName(ref);
+        if (schemaName) {
+          const values = schemas[schemaName];
+          ret[pathKey] = values;
+        }
+      } else {
+        // TODO: Support primitive Object
+        if (schema.type === "object") {
+          ret[pathKey] = parseObject(schema, schemas);
+        } else if (schema.type === "array") {
+          ret[pathKey] = parseArray(schema, schemas); // TODO//
         } else {
-          // TODO: Support primitive Object
-          ret[normalizePath(path)] = val.schema.properties;
+          ret[pathKey] = val.schema.properties;
         }
       }
     }
@@ -181,10 +178,97 @@ const composeMockData = (
   return ret;
 };
 
+type ObjectType = {
+  type: DataType;
+  properties: any;
+};
+
+export const isAllOf = (property: any): boolean => {
+  return "allOf" in property;
+};
+
+export const isOneOf = (property: any): boolean => {
+  return "oneOf" in property;
+};
+
+export const isAnyOf = (property: any): boolean => {
+  return "anyOf" in property;
+};
+
+export const isRef = (property: any): boolean => {
+  return "$ref" in property;
+};
+
+export const mergeAllOf = (properties: any[], schemas: any): any => {
+  let ret: any = {};
+  properties.forEach((property: any) => {
+    if (isRef(property)) {
+      const schemaName = getSchemaName(property["$ref"]);
+      if (schemaName) {
+        const schemaData = getMockData(schemas, schemaName);
+        ret = Object.assign({}, ret, schemaData);
+      }
+    } else if (DataType.isObject(property.type)) {
+      const parsed = parseObject(property, schemas);
+      ret = Object.assign({}, ret, parsed);
+    }
+  });
+  return ret;
+};
+
+export const parseObject = (obj: ObjectType, schemas: Schemas): any => {
+  if (!obj.properties) {
+    return {};
+  }
+  return Object.keys(obj.properties).reduce((acc: any, key: string) => {
+    const property = obj.properties[key];
+    if (isRef(property)) {
+      const schemaName = getSchemaName(property["$ref"]);
+      if (schemaName) {
+        const schema = getMockData(schemas, schemaName);
+        acc[key] = Object.assign({}, schema);
+      }
+    } else if (isAllOf(property)) {
+      acc[key] = mergeAllOf(property["allOf"], schemas);
+    } else if (isAnyOf(property) || isOneOf(property)) {
+    } else if (DataType.isObject(property.type)) {
+      acc[key] = parseObject(property, schemas);
+    } else if (DataType.isArray(property.type)) {
+      acc[key] = parseArray(property, schemas);
+    } else {
+      acc[key] = property.example || DataType.defaultValue(property.type);
+    }
+    return acc;
+  }, {});
+};
+
+type ArrayType = {
+  type: DataType.array;
+  items: any;
+};
+
+export const parseArray = (arr: ArrayType, schemas: Schemas): any => {
+  if (isRef(arr.items)) {
+    const schemaName = getSchemaName(arr.items["$ref"]);
+    return schemaName ? schemas[schemaName] : [];
+  } else {
+    return [DataType.defaultValue(arr.items.type)];
+  }
+};
+
 // Replace `{}, /` charactors with `_`
 export const normalizePath = (path: string): string => {
   const replaced = path.replace(/^\/|{|}/g, "");
   return replaced.replace(/\//g, "_");
+};
+
+export const writeFiles = (data: { [file: string]: any }): void => {
+  Object.keys(data).forEach(key => {
+    const val = data[key];
+    const path = join(__dirname, `${key}.json`);
+    const formatted = JSON.stringify(val, null, 2);
+    fs.writeFileSync(path, formatted);
+  });
 };
 
 commander
@@ -195,7 +279,7 @@ commander
       const responses = extractResponses(content);
       const schemas = extractSchemas(content);
       const composed = composeMockData(responses, schemas);
-      console.log(schemas);
+      writeFiles(composed);
     } catch (e) {
       console.error(e);
     }
