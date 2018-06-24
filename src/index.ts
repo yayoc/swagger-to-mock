@@ -1,26 +1,24 @@
 import * as commander from "commander";
+import {
+  OpenAPIObject,
+  SchemaObject,
+  ReferenceObject,
+  PathItemObject
+} from "openapi3-ts";
 import { parse } from "./parse";
-import { DataType, isAllOf, isOneOf, isAnyOf, isRef } from "./dataType";
+import {
+  DataType,
+  isObject,
+  isArray,
+  isAllOf,
+  isOneOf,
+  isAnyOf,
+  isRef
+} from "./dataType";
 import { getSchemaName, normalizePath, writeFiles } from "./util";
 
-const APPLICATION_JSON = "application/json"
+const APPLICATION_JSON = "application/json";
 const REF = "$ref";
-
-type OpenAPI = {
-  openapi: string;
-  info: {
-    version: string;
-    title: string;
-    license: string;
-  };
-  servers: { url: string }[];
-  paths: {
-    [key: string]: {};
-  };
-  components: {
-    schemas: {};
-  };
-};
 
 type ResponsesType = {
   [path: string]: {
@@ -28,12 +26,12 @@ type ResponsesType = {
   };
 };
 
-const extractResponses = (obj: OpenAPI): ResponsesType => {
+const extractResponses = (obj: OpenAPIObject): ResponsesType => {
   let ret: any = {};
   Object.keys(obj.paths).forEach(path => {
-    const methods = obj.paths[path];
+    const methods: PathItemObject = obj.paths[path];
     Object.keys(methods).forEach((method: string) => {
-      const api = (methods as any)[method];
+      const api = methods[method];
       const { responses } = api;
       Object.keys(responses).forEach((statusCode: string) => {
         const response = responses[statusCode];
@@ -47,11 +45,12 @@ const extractResponses = (obj: OpenAPI): ResponsesType => {
 };
 
 type Schemas = {
-  [key: string]: {};
+  [schema: string]: SchemaObject;
 };
 
-const extractSchemas = (obj: OpenAPI): Schemas => {
-  const { schemas } = obj.components;
+const extractSchemas = (obj: OpenAPIObject): Schemas => {
+  const { components } = obj;
+  const schemas = components && components.schemas ? components.schemas : {};
   return Object.keys(schemas).reduce((acc: any, name: string) => {
     acc[name] = getSchemaData(schemas, name);
     return acc;
@@ -59,11 +58,11 @@ const extractSchemas = (obj: OpenAPI): Schemas => {
 };
 
 // Retrieve mock data of schema.
-const getSchemaData = (schemas: any, name: string): Object => {
+const getSchemaData = (schemas: Schemas, name: string): Object => {
   const schema = schemas[name];
   if (isAllOf(schema)) {
     return mergeAllOf(schema["allOf"], schemas);
-  } else if (DataType.isArray(schema.type)) {
+  } else if (isArray(schema)) {
     return parseArray(schema, schemas);
   } else if ("properties" in schema) {
     return parseObject(schema, schemas);
@@ -106,7 +105,7 @@ const composeMockData = (
         if (DataType.isObject(schema.type)) {
           ret[pathKey] = parseObject(schema, schemas);
         } else if (DataType.isArray(schema.type)) {
-          ret[pathKey] = parseArray(schema, schemas); 
+          ret[pathKey] = parseArray(schema, schemas);
         } else {
           ret[pathKey] = val.schema.properties;
         }
@@ -116,12 +115,10 @@ const composeMockData = (
   return ret;
 };
 
-type ObjectType = {
-  type: DataType;
-  properties: any;
-};
-
-export const mergeAllOf = (properties: any[], schemas: any): any => {
+export const mergeAllOf = (
+  properties: (SchemaObject | ReferenceObject)[],
+  schemas: Schemas
+): any => {
   let ret: any = {};
   properties.forEach((property: any) => {
     if (isRef(property)) {
@@ -138,12 +135,12 @@ export const mergeAllOf = (properties: any[], schemas: any): any => {
   return ret;
 };
 
-export const parseObject = (obj: ObjectType, schemas: Schemas): any => {
+export const parseObject = (obj: SchemaObject, schemas: Schemas): any => {
   if (!obj.properties) {
     return {};
   }
   return Object.keys(obj.properties).reduce((acc: any, key: string) => {
-    const property = obj.properties[key];
+    const property = obj.properties![key];
     if (isRef(property)) {
       const schemaName = getSchemaName(property[REF]);
       if (schemaName) {
@@ -153,23 +150,21 @@ export const parseObject = (obj: ObjectType, schemas: Schemas): any => {
     } else if (isAllOf(property)) {
       acc[key] = mergeAllOf(property["allOf"], schemas);
     } else if (isAnyOf(property) || isOneOf(property)) {
-    } else if (DataType.isObject(property.type)) {
+    } else if (isObject(property)) {
       acc[key] = parseObject(property, schemas);
-    } else if (DataType.isArray(property.type)) {
+    } else if (isArray(property)) {
       acc[key] = parseArray(property, schemas);
-    } else {
+    } else if (property.type) {
       acc[key] = property.example || DataType.defaultValue(property.type);
     }
     return acc;
   }, {});
 };
 
-type ArrayType = {
-  type: DataType.array;
-  items: any;
-};
-
-export const parseArray = (arr: ArrayType, schemas: Schemas): any => {
+export const parseArray = (
+  arr: SchemaObject & { items: SchemaObject | ReferenceObject },
+  schemas: Schemas
+): Object[] => {
   if (isRef(arr.items)) {
     const schemaName = getSchemaName(arr.items[REF]);
     if (schemaName) {
@@ -177,9 +172,10 @@ export const parseArray = (arr: ArrayType, schemas: Schemas): any => {
       return [schema];
     }
     return [];
-  } else {
+  } else if (arr.items.type) {
     return [DataType.defaultValue(arr.items.type)];
   }
+  return [];
 };
 
 commander

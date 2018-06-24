@@ -1,3 +1,5 @@
+import { SchemaObject, ReferenceObject } from "openapi3-ts";
+
 export enum DataType {
   string = "string",
   number = "number",
@@ -8,31 +10,31 @@ export enum DataType {
 }
 
 export namespace DataType {
-  export function isString(type: DataType): boolean {
+  export function isString(type: string): boolean {
     return type === DataType.string;
   }
 
-  export function isNumber(type: DataType): boolean {
+  export function isNumber(type: string): boolean {
     return type === DataType.number;
   }
 
-  export function isInteger(type: DataType): boolean {
+  export function isInteger(type: string): boolean {
     return type === DataType.integer;
   }
 
-  export function isBoolean(type: DataType): boolean {
+  export function isBoolean(type: string): boolean {
     return type === DataType.boolean;
   }
 
-  export function isArray(type: DataType): boolean {
+  export function isArray(type: string): boolean {
     return type === DataType.array;
   }
 
-  export function isObject(type: DataType): boolean {
+  export function isObject(type: string): boolean {
     return type === DataType.object;
   }
 
-  export function defaultValue(type: DataType): any {
+  export function defaultValue(type: string): any {
     switch (type) {
       case DataType.string:
         return "";
@@ -49,18 +51,34 @@ export namespace DataType {
   }
 }
 
-export const isAllOf = (property: any): boolean => {
-  return "allOf" in property;
+export const isArray = (
+  property: SchemaObject
+): property is SchemaObject & { items: SchemaObject | ReferenceObject } => {
+  return property.type === DataType.array;
 };
 
-export const isOneOf = (property: any): boolean => {
-  return "oneOf" in property;
+export const isObject = (
+  schema: SchemaObject
+): schema is SchemaObject & { type: "object" } => {
+  return schema.type === DataType.object;
 };
 
-export const isAnyOf = (property: any): boolean => {
-  return "anyOf" in property;
+export const isAllOf = (
+  schema: SchemaObject
+): schema is SchemaObject & { allOf: (SchemaObject | ReferenceObject)[] } => {
+  return schema.allOf !== undefined;
 };
 
-export const isRef = (property: any): boolean => {
-  return "$ref" in property;
+export const isOneOf = (schema: SchemaObject): boolean => {
+  return "oneOf" in schema;
+};
+
+export const isAnyOf = (schema: SchemaObject): boolean => {
+  return "anyOf" in schema;
+};
+
+export const isRef = (
+  schema: SchemaObject | ReferenceObject
+): schema is ReferenceObject => {
+  return "$ref" in schema;
 };
