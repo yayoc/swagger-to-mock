@@ -2,7 +2,7 @@
   "name": "swagger-to-mock",
   "version": "0.1.4",
   "description": "mock data generator from Swagger (OpenAPI 3)",
-  "main": "dist/index.js",
+  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
@@ -11,7 +11,24 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
   },
+  "keywords": [
+    "openapi3",
+    "swagger",
+    "mock",
+    "cli"
+  ],
+  "bin": {
+    "swagger-to-mock": "./dist/index.js"
+  },
   "author": "yayoc <n.yayoshi@gmail.com> (http://yayoc.com)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yayoc/swagger-to-mock.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yayoc/swagger-to-mock/issues"
+  },
+  "homepage": "https://github.com/yayoc/swagger-to-mock#readme",
   "license": "MIT",
   "devDependencies": {
     "@types/jest": "^23.1.1",
