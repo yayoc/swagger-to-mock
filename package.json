@@ -2,8 +2,8 @@
   "name": "swagger-to-mock",
   "version": "0.1.2",
   "description": "mock data generator from Swagger (OpenAPI 3)",
-  "main": "./build/index.js",
-  "types": "./build/index.d.ts",
+  "main": "dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "prepublish": "npm run build",
