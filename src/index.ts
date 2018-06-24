@@ -1,7 +1,10 @@
 import * as commander from "commander";
-import * as fs from "fs";
-import { join } from "path";
 import { parse } from "./parse";
+import { DataType, isAllOf, isOneOf, isAnyOf, isRef } from "./dataType";
+import { getSchemaName, normalizePath, writeFiles } from "./util";
+
+const APPLICATION_JSON = "application/json"
+const REF = "$ref";
 
 type OpenAPI = {
   openapi: string;
@@ -21,7 +24,7 @@ type OpenAPI = {
 
 type ResponsesType = {
   [path: string]: {
-    "application/json": { schema: any };
+    [APPLICATION_JSON]: { schema: any };
   };
 };
 
@@ -55,70 +58,6 @@ const extractSchemas = (obj: OpenAPI): Schemas => {
   }, {});
 };
 
-// Type Check
-
-enum DataType {
-  string = "string",
-  number = "number",
-  integer = "integer",
-  boolean = "boolean",
-  array = "array",
-  object = "object"
-}
-
-namespace DataType {
-  export function isString(type: DataType): boolean {
-    return type === DataType.string;
-  }
-
-  export function isNumber(type: DataType): boolean {
-    return type === DataType.number;
-  }
-
-  export function isInteger(type: DataType): boolean {
-    return type === DataType.integer;
-  }
-
-  export function isBoolean(type: DataType): boolean {
-    return type === DataType.boolean;
-  }
-
-  export function isArray(type: DataType): boolean {
-    return type === DataType.array;
-  }
-
-  export function isObject(type: DataType): boolean {
-    return type === DataType.object;
-  }
-
-  export function defaultValue(type: DataType): any {
-    switch (type) {
-      case DataType.string:
-        return "";
-      case DataType.number:
-      case DataType.integer:
-        return 0;
-      case DataType.boolean:
-        return true;
-      case DataType.array:
-        return [];
-      case DataType.object:
-        return {};
-    }
-  }
-}
-
-// Extract schema name
-export const getSchemaName = (ref: string): string | null => {
-  const re = /#\/components\/schemas\/(.*)/;
-  const matches = ref.match(re);
-  const found = matches;
-  if (found) {
-    return found[1];
-  }
-  return null;
-};
-
 // Retrieve mock data of schema.
 const getSchemaData = (schemas: any, name: string): Object => {
   const schema = schemas[name];
@@ -134,7 +73,7 @@ const getSchemaData = (schemas: any, name: string): Object => {
     }
     return {};
   } else if (isRef(schema)) {
-    const schemaName = getSchemaName(schema["$ref"]);
+    const schemaName = getSchemaName(schema[REF]);
     return schemaName ? getSchemaData(schemas, schemaName) : {};
   }
   return schema;
@@ -154,9 +93,9 @@ const composeMockData = (
     const res: any = responses[path];
     const pathKey = normalizePath(path);
     if (res) {
-      const val = res["application/json"];
+      const val = res[APPLICATION_JSON];
       const { schema } = val;
-      const ref = schema["$ref"];
+      const ref = schema[REF];
       if (ref) {
         const schemaName = getSchemaName(ref);
         if (schemaName) {
@@ -164,11 +103,10 @@ const composeMockData = (
           ret[pathKey] = values;
         }
       } else {
-        // TODO: Support primitive Object
-        if (schema.type === "object") {
+        if (DataType.isObject(schema.type)) {
           ret[pathKey] = parseObject(schema, schemas);
-        } else if (schema.type === "array") {
-          ret[pathKey] = parseArray(schema, schemas); // TODO//
+        } else if (DataType.isArray(schema.type)) {
+          ret[pathKey] = parseArray(schema, schemas); 
         } else {
           ret[pathKey] = val.schema.properties;
         }
@@ -183,27 +121,11 @@ type ObjectType = {
   properties: any;
 };
 
-export const isAllOf = (property: any): boolean => {
-  return "allOf" in property;
-};
-
-export const isOneOf = (property: any): boolean => {
-  return "oneOf" in property;
-};
-
-export const isAnyOf = (property: any): boolean => {
-  return "anyOf" in property;
-};
-
-export const isRef = (property: any): boolean => {
-  return "$ref" in property;
-};
-
 export const mergeAllOf = (properties: any[], schemas: any): any => {
   let ret: any = {};
   properties.forEach((property: any) => {
     if (isRef(property)) {
-      const schemaName = getSchemaName(property["$ref"]);
+      const schemaName = getSchemaName(property[REF]);
       if (schemaName) {
         const schemaData = getSchemaData(schemas, schemaName);
         ret = Object.assign({}, ret, schemaData);
@@ -223,7 +145,7 @@ export const parseObject = (obj: ObjectType, schemas: Schemas): any => {
   return Object.keys(obj.properties).reduce((acc: any, key: string) => {
     const property = obj.properties[key];
     if (isRef(property)) {
-      const schemaName = getSchemaName(property["$ref"]);
+      const schemaName = getSchemaName(property[REF]);
       if (schemaName) {
         const schema = getSchemaData(schemas, schemaName);
         acc[key] = Object.assign({}, schema);
@@ -249,7 +171,7 @@ type ArrayType = {
 
 export const parseArray = (arr: ArrayType, schemas: Schemas): any => {
   if (isRef(arr.items)) {
-    const schemaName = getSchemaName(arr.items["$ref"]);
+    const schemaName = getSchemaName(arr.items[REF]);
     if (schemaName) {
       const schema = getSchemaData(schemas, schemaName);
       return [schema];
@@ -258,21 +180,6 @@ export const parseArray = (arr: ArrayType, schemas: Schemas): any => {
   } else {
     return [DataType.defaultValue(arr.items.type)];
   }
-};
-
-// Replace `{}, /` charactors with `_`
-export const normalizePath = (path: string): string => {
-  const replaced = path.replace(/^\/|{|}/g, "");
-  return replaced.replace(/\//g, "_");
-};
-
-export const writeFiles = (data: { [file: string]: any }): void => {
-  Object.keys(data).forEach(key => {
-    const val = data[key];
-    const path = join(__dirname, `${key}.json`);
-    const formatted = JSON.stringify(val, null, 2);
-    fs.writeFileSync(path, formatted);
-  });
 };
 
 commander
