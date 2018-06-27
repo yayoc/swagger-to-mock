@@ -19,7 +19,9 @@ export const composeMockData = (
     const pathKey = normalizePath(path);
     if (res) {
       const val = res[APPLICATION_JSON];
-      if ("examples" in val) {
+      if ("example" in val) {
+        ret[pathKey] = val.example;
+      } else if ("examples" in val) {
         ret[pathKey] = val.examples;
       } else if ("schema" in val) {
         const { schema } = val;
