@@ -19,21 +19,25 @@ export const composeMockData = (
     const pathKey = normalizePath(path);
     if (res) {
       const val = res[APPLICATION_JSON];
-      const { schema } = val;
-      const ref = schema[REF];
-      if (ref) {
-        const schemaName = getSchemaName(ref);
-        if (schemaName) {
-          const values = schemas[schemaName];
-          ret[pathKey] = values;
-        }
-      } else {
-        if (isObject(schema)) {
-          ret[pathKey] = parseObject(schema, schemas);
-        } else if (isArray(schema)) {
-          ret[pathKey] = parseArray(schema, schemas);
+      if ("examples" in val) {
+        ret[pathKey] = val.examples;
+      } else if ("schema" in val) {
+        const { schema } = val;
+        const ref = schema[REF];
+        if (ref) {
+          const schemaName = getSchemaName(ref);
+          if (schemaName) {
+            const values = schemas[schemaName];
+            ret[pathKey] = values;
+          }
         } else {
-          ret[pathKey] = val.schema.properties;
+          if (isObject(schema)) {
+            ret[pathKey] = parseObject(schema, schemas);
+          } else if (isArray(schema)) {
+            ret[pathKey] = parseArray(schema, schemas);
+          } else {
+            ret[pathKey] = val.schema.properties;
+          }
         }
       }
     }
