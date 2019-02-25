@@ -13,13 +13,15 @@ const log = console.log;
 log(chalk.yellowBright("swagger-to-mock"));
 commander
   .arguments("<file>")
-  .action(async file => {
+  .option("-d, --dir <name>", "output directory")
+  .action(async (file, cmd) => {
     try {
       const content = parse(file);
       const responses = extractResponses(content);
       const schemas = extractSchemas(content);
       const composed = composeMockData(responses, schemas);
-      writeFiles(composed, log);
+      const outputPath = cmd.dir ? cmd.dir : ".";
+      writeFiles(composed, outputPath, log);
       log(chalk.yellowBright("Completed"));
     } catch (e) {
       log(chalk.redBright(e));
