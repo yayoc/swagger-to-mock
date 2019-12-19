@@ -112,6 +112,8 @@ export const parseArray = (
       return [schema];
     }
     return [];
+  } else if (isObject(arr.items)) {
+    return [parseObject(arr.items, schemas)];
   } else if (arr.items.type) {
     return [DataType.defaultValue(arr.items)];
   }
