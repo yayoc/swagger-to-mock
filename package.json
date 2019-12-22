@@ -57,6 +57,7 @@
     "commander": "^4.0.0",
     "js-yaml": "^3.12.0",
     "path": "^0.12.7",
-    "openapi3-ts": "^1.0.0"
+    "openapi3-ts": "^1.0.0",
+    "swagger-combine": "^1.0.0"
   }
 }
