@@ -52,7 +52,7 @@
   "dependencies": {
     "@types/chalk": "^2.2.0",
     "@types/commander": "^2.12.2",
-    "@types/js-yaml": "^3.11.1",
+    "@types/js-yaml": "^3.12.4",
     "chalk": "^2.4.1",
     "commander": "^5.0.0",
     "js-yaml": "^3.12.0",
