@@ -6,6 +6,8 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "prebuild": "rm -rf ./dist/",
+    "start": "npm run build && node ./dist/index.js -d ./dist/",
     "prepublish": "npm run build",
     "test": "jest",
     "test:watch": "jest --watch",

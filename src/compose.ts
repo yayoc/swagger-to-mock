@@ -1,8 +1,8 @@
-import { ResponsesType, APPLICATION_JSON } from "./response";
-import { Schemas } from "./schema";
-import { normalizePath, getSchemaName } from "./util";
-import { REF, parseObject, parseArray } from "./parse";
-import { isObject, isArray } from "./dataType";
+import {APPLICATION_JSON, ResponsesType} from "./response";
+import {Schemas} from "./schema";
+import {getSchemaName, normalizeName, normalizePath} from "./util";
+import {parseArray, parseObject, REF} from "./parse";
+import {isArray, isObject} from "./dataType";
 
 type MockData = {
   [path: string]: any;
@@ -22,15 +22,21 @@ export const composeMockData = (
       if ("example" in val) {
         ret[pathKey] = val.example;
       } else if ("examples" in val) {
-        ret[pathKey] = val.examples;
+        if (Object.keys(val.examples).length <= 1) {
+          ret[pathKey] = val.examples;
+        } else {
+          for (let [key, example] of Object.entries<any>(val.examples)) {
+            const extendedPathKey = pathKey + "_" + normalizeName(key)
+            ret[extendedPathKey] = example["value"];
+          }
+        }
       } else if ("schema" in val) {
         const { schema } = val;
         const ref = schema[REF];
         if (ref) {
           const schemaName = getSchemaName(ref);
           if (schemaName) {
-            const values = schemas[schemaName];
-            ret[pathKey] = values;
+            ret[pathKey] = schemas[schemaName];
           }
         } else {
           if (isObject(schema)) {

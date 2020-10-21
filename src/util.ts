@@ -18,6 +18,12 @@ export const normalizePath = (path: string): string => {
   return replaced.replace(/\//g, "_");
 };
 
+export const normalizeName = (name: string): string => {
+  return name.toLowerCase()
+      .replace(/ /g, "_")
+      .replace(/,/g, "");
+};
+
 // Write each response to JSON files.
 export const writeFiles = (
   data: { [file: string]: any },
