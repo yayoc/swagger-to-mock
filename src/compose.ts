@@ -1,8 +1,8 @@
-import {APPLICATION_JSON, ResponsesType} from "./response";
-import {Schemas} from "./schema";
-import {getSchemaName, normalizeName, normalizePath} from "./util";
-import {parseArray, parseObject, REF} from "./parse";
-import {isArray, isObject} from "./dataType";
+import { ResponsesType, APPLICATION_JSON } from "./response";
+import { Schemas } from "./schema";
+import { normalizeName, normalizePath, getSchemaName } from "./util";
+import { REF, parseObject, parseArray } from "./parse";
+import { isObject, isArray } from "./dataType";
 
 type MockData = {
   [path: string]: any;
